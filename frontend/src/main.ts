@@ -64,7 +64,6 @@ import { ProductReviewService } from './app/Services/product-review.service'
 import { WindowRefService } from './app/Services/window-ref.service'
 import { FeedbackService } from './app/Services/feedback.service'
 import { CaptchaService } from './app/Services/captcha.service'
-import { SecurityAnswerService } from './app/Services/security-answer.service'
 import { UserService } from './app/Services/user.service'
 import { DataSubjectService } from './app/Services/data-subject.service'
 import { SecurityQuestionService } from './app/Services/security-question.service'
@@ -93,7 +92,6 @@ bootstrapApplication(AppComponent, {
         SecurityQuestionService,
         DataSubjectService,
         UserService,
-        SecurityAnswerService,
         CaptchaService,
         FeedbackService,
         WindowRefService,

@@ -167,6 +167,19 @@ void collectDurationPromise('validatePreconditions', validatePreconditions)()
 void collectDurationPromise('cleanupFtpFolder', cleanupFtpFolder)()
 void collectDurationPromise('validateConfig', validateConfig)({})
 
+/* Creates the security answer of a user registration. The UserId is never taken from the request
+   body but always from the user created during the very same request, so that nobody can plant a
+   security answer - and with it the ability to reset the password - on someone else's account. */
+async function createSecurityAnswerForRegisteredUser (body: any, UserId: number) {
+  const securityQuestion = body?.securityQuestion
+  const SecurityQuestionId = Number(securityQuestion !== null && typeof securityQuestion === 'object' ? securityQuestion.id : securityQuestion)
+  const answer = body?.securityAnswer
+  if (!Number.isInteger(SecurityQuestionId) || SecurityQuestionId <= 0 || typeof answer !== 'string' || answer.length === 0) {
+    return
+  }
+  await SecurityAnswerModel.create({ UserId, SecurityQuestionId, answer })
+}
+
 function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   /* Locals */
   app.locals.captchaId = 0
@@ -410,9 +423,10 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   /* SecurityQuestions: Only GET list of questions allowed. */
   app.post('/api/SecurityQuestions', security.denyAll())
   app.use('/api/SecurityQuestions/:id', security.denyAll())
-  /* SecurityAnswers: Only POST of answer allowed. */
-  app.get('/api/SecurityAnswers', security.denyAll())
-  app.use('/api/SecurityAnswers/:id', security.denyAll())
+  /* SecurityAnswers: Not exposed at all. A security answer is credential-equivalent, as it
+     alone authorizes a password reset. It is therefore created server-side for the user that
+     is registered in the very same request (see below) instead of for a caller-chosen UserId. */
+  app.use('/api/SecurityAnswers', security.denyAll())
   /* REST API */
   app.use('/rest/user/authentication-details', security.isAuthorized())
   app.use('/rest/basket/:id', security.isAuthorized())
@@ -535,6 +549,16 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
       }) // vuln-code-snippet neutral-line registerAdminChallenge
     } // vuln-code-snippet neutral-line registerAdminChallenge
     // vuln-code-snippet end registerAdminChallenge
+
+    // store the security answer of a registration for the user created in that same request
+    if (name === 'User') {
+      resource.create.send.before((req: Request, res: Response, context: { instance: { id: number }, continue: any }) => {
+        createSecurityAnswerForRegisteredUser(req.body, context.instance.id).catch((err: unknown) => {
+          logger.warn(`Could not create security answer for user #${context.instance.id}: ${utils.getErrorMessage(err)}`)
+        })
+        return context.continue
+      })
+    }
 
     // translate challenge descriptions on-the-fly
     if (name === 'Challenge') {

@@ -122,6 +122,8 @@ const relationsInit = (_sequelize: Sequelize) => {
   })
 
   SecurityAnswerModel.belongsTo(UserModel, {
+    constraints: true,
+    foreignKeyConstraint: true,
     foreignKey: {
       name: 'UserId'
     }

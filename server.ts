@@ -552,10 +552,12 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
 
     // store the security answer of a registration for the user created in that same request
     if (name === 'User') {
-      resource.create.send.before((req: Request, res: Response, context: { instance: { id: number }, continue: any }) => {
-        createSecurityAnswerForRegisteredUser(req.body, context.instance.id).catch((err: unknown) => {
+      resource.create.send.before(async (req: Request, res: Response, context: { instance: { id: number }, continue: any }) => {
+        try {
+          await createSecurityAnswerForRegisteredUser(req.body, context.instance.id)
+        } catch (err) {
           logger.warn(`Could not create security answer for user #${context.instance.id}: ${utils.getErrorMessage(err)}`)
-        })
+        }
         return context.continue
       })
     }

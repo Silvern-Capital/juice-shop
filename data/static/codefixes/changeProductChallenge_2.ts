@@ -34,9 +34,10 @@
   /* SecurityQuestions: Only GET list of questions allowed. */
   app.post('/api/SecurityQuestions', security.denyAll())
   app.use('/api/SecurityQuestions/:id', security.denyAll())
-  /* SecurityAnswers: Only POST of answer allowed. */
-  app.get('/api/SecurityAnswers', security.denyAll())
-  app.use('/api/SecurityAnswers/:id', security.denyAll())
+  /* SecurityAnswers: Not exposed at all. A security answer is credential-equivalent, as it
+     alone authorizes a password reset. It is therefore created server-side for the user that
+     is registered in the very same request (see below) instead of for a caller-chosen UserId. */
+  app.use('/api/SecurityAnswers', security.denyAll())
   /* REST API */
   app.use('/rest/user/authentication-details', security.isAuthorized())
   app.use('/rest/basket/:id', security.isAuthorized())

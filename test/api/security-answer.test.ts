@@ -4,17 +4,23 @@
  */
 
 import { describe, it, before } from 'node:test'
-import { setTimeout as sleep } from 'node:timers/promises'
 import assert from 'node:assert/strict'
 import request from 'supertest'
 import config from 'config'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
+import { UserModel } from '../../models/user'
 import * as security from '../../lib/insecurity'
 
 let app: Express
 const authHeader = { Authorization: `Bearer ${security.authorize()}`, 'content-type': 'application/json' }
 const jsonHeader = { 'content-type': 'application/json' }
+const adminWithoutAnswer = `testing@${config.get<string>('application.domain')}`
+
+async function securityQuestionOf (email: string) {
+  const res = await request(app).get(`/rest/user/security-question?email=${encodeURIComponent(email)}`)
+  return res.body
+}
 
 before(async () => {
   const result = await createTestApp()
@@ -44,31 +50,28 @@ void describe('/api/SecurityAnswers', () => {
   })
 
   void it('POST security answer cannot be planted on an account without one to reset its password', async () => {
-    const email = `testing@${config.get<string>('application.domain')}`
+    const admin = await UserModel.findOne({ where: { email: adminWithoutAnswer } })
+    assert.ok(admin, `Expected seeded admin ${adminWithoutAnswer} to exist`)
+    assert.deepEqual(await securityQuestionOf(adminWithoutAnswer), {})
 
-    for (let UserId = 1; UserId <= 25; UserId++) {
-      const res = await request(app)
-        .post('/api/SecurityAnswers')
-        .set(jsonHeader)
-        .send({ UserId, SecurityQuestionId: 1, answer: 'Horst' })
+    const plantRes = await request(app)
+      .post('/api/SecurityAnswers')
+      .set(jsonHeader)
+      .send({ UserId: admin.id, SecurityQuestionId: 1, answer: 'Horst' })
 
-      assert.equal(res.status, 401)
-    }
-
-    const questionRes = await request(app).get(`/rest/user/security-question?email=${encodeURIComponent(email)}`)
-    assert.deepEqual(questionRes.body, {})
+    assert.equal(plantRes.status, 401)
 
     const resetRes = await request(app)
       .post('/rest/user/reset-password')
       .set(jsonHeader)
-      .send({ email, answer: 'Horst', new: 'pwn3d-by-anyone', repeat: 'pwn3d-by-anyone' })
+      .send({ email: adminWithoutAnswer, answer: 'Horst', new: 'pwn3d-by-anyone', repeat: 'pwn3d-by-anyone' })
 
     assert.equal(resetRes.status, 401)
 
     const loginRes = await request(app)
       .post('/rest/user/login')
       .set(jsonHeader)
-      .send({ email, password: 'IamUsedForTesting' })
+      .send({ email: adminWithoutAnswer, password: 'IamUsedForTesting' })
 
     assert.equal(loginRes.status, 200)
   })
@@ -118,10 +121,7 @@ void describe('/api/Users', () => {
       })
 
     assert.equal(userRes.status, 201)
-    await sleep(500)
-
-    const questionRes = await request(app).get(`/rest/user/security-question?email=${encodeURIComponent(email)}`)
-    assert.equal(questionRes.body.question?.id, 1)
+    assert.equal((await securityQuestionOf(email)).question?.id, 1)
 
     const resetRes = await request(app)
       .post('/rest/user/reset-password')
@@ -129,6 +129,25 @@ void describe('/api/Users', () => {
       .send({ email, answer: 'Horst', new: 'ncc-1701', repeat: 'ncc-1701' })
 
     assert.equal(resetRes.status, 200)
+  })
+
+  void it('POST new user ignores a UserId in the body when storing the security answer', async () => {
+    const email = 'hijacker@te.st'
+
+    const userRes = await request(app)
+      .post('/api/Users')
+      .set(jsonHeader)
+      .send({
+        email,
+        password: '12345',
+        UserId: (await UserModel.findOne({ where: { email: adminWithoutAnswer } }))?.id,
+        securityQuestion: { id: 2 },
+        securityAnswer: 'Horst'
+      })
+
+    assert.equal(userRes.status, 201)
+    assert.equal((await securityQuestionOf(email)).question?.id, 2)
+    assert.deepEqual(await securityQuestionOf(adminWithoutAnswer), {})
   })
 
   void it('POST new user without security question and answer leaves the account without one', async () => {
@@ -140,9 +159,6 @@ void describe('/api/Users', () => {
       .send({ email, password: '12345' })
 
     assert.equal(userRes.status, 201)
-    await sleep(500)
-
-    const questionRes = await request(app).get(`/rest/user/security-question?email=${encodeURIComponent(email)}`)
-    assert.deepEqual(questionRes.body, {})
+    assert.deepEqual(await securityQuestionOf(email), {})
   })
 })

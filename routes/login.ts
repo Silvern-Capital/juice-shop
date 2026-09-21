@@ -14,6 +14,17 @@ import * as models from '../models/index'
 import { type User } from '../data/types'
 import * as utils from '../lib/utils'
 
+/* Collects the accounts of an external identity provider from a query that cannot be tampered with, so that
+   the rejection of their password logins does not depend on the result of the login query itself. */
+export function loadFederatedAccounts () {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const federatedUsers = await UserModel.findAll({ where: { isFederated: true }, attributes: ['id', 'email'] })
+    res.locals.federatedUserIds = new Set(federatedUsers.map((user) => user.id))
+    res.locals.federatedUserEmails = new Set(federatedUsers.map((user) => user.email.toLowerCase()))
+    next()
+  }
+}
+
 // vuln-code-snippet start loginAdminChallenge loginBenderChallenge loginJimChallenge
 export function login () {
   function afterLogin (user: User, res: Response, next: NextFunction) {
@@ -56,9 +67,12 @@ export function login () {
   }
   // vuln-code-snippet end loginAdminChallenge loginBenderChallenge loginJimChallenge
 
-  /* Accounts of an external identity provider have no password to authenticate with, so any match is rejected */
+  /* Accounts of an external identity provider have no password to authenticate with, so any match is rejected.
+     The matched row can originate from an injected query, hence its own flag is not trusted on its own. */
   function rejectFederatedUser (user: User, res: Response) {
-    if (!user.isFederated) {
+    const federatedUserIds: Set<number> = res.locals.federatedUserIds ?? new Set()
+    const federatedUserEmails: Set<string> = res.locals.federatedUserEmails ?? new Set()
+    if (!user.isFederated && !federatedUserIds.has(Number(user.id)) && !federatedUserEmails.has(String(user.email).toLowerCase())) {
       return false
     }
     res.status(401).send(res.__('Invalid email or password.'))

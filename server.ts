@@ -65,7 +65,7 @@ import restoreOverwrittenFilesWithOriginals from './lib/startup/restoreOverwritt
 import datacreator from './data/datacreator'
 import locales from './data/static/locales.json'
 
-import { login } from './routes/login'
+import { login, loadFederatedAccounts } from './routes/login'
 import { oauthLogin } from './routes/oauthLogin'
 import * as verify from './routes/verify'
 import * as address from './routes/address'
@@ -615,7 +615,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   }
 
   /* Custom Restful API */
-  app.post('/rest/user/login', login())
+  app.post('/rest/user/login', utils.asyncHandler(loadFederatedAccounts()), login())
   app.post('/rest/user/oauth-login', utils.asyncHandler(oauthLogin()))
   app.get('/rest/user/change-password', utils.asyncHandler(changePassword()))
   app.post('/rest/user/reset-password', utils.asyncHandler(resetPassword()))

@@ -245,6 +245,30 @@ void describe('/rest/user/login', () => {
     assert.equal(typeof res.body.authentication.token, 'string')
   })
 
+  void it('POST login as bjoern.kimminich@gmail.com via UNION SELECT injection attack is rejected', async () => {
+    const res = await request(app)
+      .post('/rest/user/login')
+      .set({ 'content-type': 'application/json' })
+      .send({
+        email: "' UNION SELECT * FROM (SELECT 4 as 'id', 'bkimminich' as 'username', 'bjoern.kimminich@gmail.com' as 'email', '12345' as 'password', 'admin' as 'role', '' as deluxeToken, '1.2.3.4' as 'lastLoginIp' , '/assets/public/images/uploads/default.svg' as 'profileImage', '' as 'totpSecret', 1 as 'isActive', 0 as 'isFederated', '1999-08-16 14:14:41.644 +00:00' as 'createdAt', '1999-08-16 14:33:41.930 +00:00' as 'updatedAt', null as 'deletedAt')--",
+        password: undefined
+      })
+
+    assert.equal(res.status, 401)
+  })
+
+  void it('POST login under the email of a federated user via UNION SELECT injection attack is rejected', async () => {
+    const res = await request(app)
+      .post('/rest/user/login')
+      .set({ 'content-type': 'application/json' })
+      .send({
+        email: "' UNION SELECT * FROM (SELECT 9999 as 'id', '' as 'username', 'BJOERN.KIMMINICH@gmail.com' as 'email', '12345' as 'password', 'admin' as 'role', '' as deluxeToken, '1.2.3.4' as 'lastLoginIp' , '/assets/public/images/uploads/default.svg' as 'profileImage', '' as 'totpSecret', 1 as 'isActive', 0 as 'isFederated', '1999-08-16 14:14:41.644 +00:00' as 'createdAt', '1999-08-16 14:33:41.930 +00:00' as 'updatedAt', null as 'deletedAt')--",
+        password: undefined
+      })
+
+    assert.equal(res.status, 401)
+  })
+
   void it('POST login with query-breaking SQL Injection attack', async () => {
     const res = await request(app)
       .post('/rest/user/login')

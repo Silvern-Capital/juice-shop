@@ -4,6 +4,7 @@
  */
 
 import request from 'supertest'
+import config from 'config'
 import { generateSync } from 'otplib'
 import type { Express } from 'express'
 import * as security from '../../../lib/insecurity'
@@ -37,6 +38,40 @@ export async function login (app: Express, { email, password, totpSecret }: { em
   }
 
   return loginRes.body.authentication
+}
+
+/**
+ * Logs in through the server-side OAuth flow with Google's token verification stubbed out,
+ * which is the only way to get a session for an account of an external identity provider.
+ */
+export async function oauthLogin (app: Express, { email, accessToken = 'valid-access-token' }: { email: string, accessToken?: string }) {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (url: any) => {
+    if (!String(url).includes('tokeninfo')) {
+      return await originalFetch(url)
+    }
+    return new Response(JSON.stringify({
+      aud: config.get<string>('application.googleOauth.clientId'),
+      email,
+      email_verified: true,
+      expires_in: 3599
+    }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof globalThis.fetch
+
+  try {
+    const res = await request(app)
+      .post('/rest/user/oauth-login')
+      .set(jsonHeader)
+      .send({ access_token: accessToken })
+
+    if (res.status !== 200) {
+      throw new Error(`Failed to login '${email}' via OAuth: ${res.status}`)
+    }
+
+    return res.body.authentication
+  } finally {
+    globalThis.fetch = originalFetch
+  }
 }
 
 export async function register (app: Express, { email, password, totpSecret }: { email: string, password: string, totpSecret?: string }) {

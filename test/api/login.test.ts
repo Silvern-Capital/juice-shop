@@ -9,6 +9,8 @@ import request from 'supertest'
 import type { Express } from 'express'
 import config from 'config'
 import { createTestApp } from './helpers/setup'
+import { oauthLogin } from './helpers/auth'
+import { UserModel } from '../../models/user'
 
 let app: Express
 
@@ -138,18 +140,39 @@ void describe('/rest/user/login', () => {
     assert.equal(res.body.status, 'totp_token_required')
   })
 
-  void it('POST login as bjoern.kimminich@gmail.com with known password', async () => {
+  void it('POST login as bjoern.kimminich@gmail.com with password derived from his email is rejected', async () => {
     const res = await request(app)
       .post('/rest/user/login')
       .set({ 'content-type': 'application/json' })
       .send({
         email: 'bjoern.kimminich@gmail.com',
-        password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
+        password: Buffer.from('bjoern.kimminich@gmail.com'.split('').reverse().join('')).toString('base64')
       })
 
-    assert.equal(res.status, 200)
-    assert.ok(res.headers['content-type']?.includes('application/json'))
-    assert.equal(typeof res.body.authentication.token, 'string')
+    assert.equal(res.status, 401)
+  })
+
+  void it('POST login as user of an external identity provider is rejected even with the right password', async () => {
+    const password = 'BestPasswordEver'
+    await request(app)
+      .post('/api/Users')
+      .set({ 'content-type': 'application/json' })
+      .send({
+        email: 'federated@juice-sh.op',
+        password
+      })
+      .expect(201)
+    await UserModel.update({ isFederated: true }, { where: { email: 'federated@juice-sh.op' } })
+
+    const res = await request(app)
+      .post('/rest/user/login')
+      .set({ 'content-type': 'application/json' })
+      .send({
+        email: 'federated@juice-sh.op',
+        password
+      })
+
+    assert.equal(res.status, 401)
   })
 
   void it('POST login with WHERE-clause disabling SQL injection attack', async () => {
@@ -213,7 +236,7 @@ void describe('/rest/user/login', () => {
       .post('/rest/user/login')
       .set({ 'content-type': 'application/json' })
       .send({
-        email: `' UNION SELECT * FROM (SELECT 15 as 'id', '' as 'username', 'acc0unt4nt@${config.get<string>('application.domain')}' as 'email', '12345' as 'password', 'accounting' as 'role', '' as deluxeToken, '1.2.3.4' as 'lastLoginIp' , '/assets/public/images/uploads/default.svg' as 'profileImage', '' as 'totpSecret', 1 as 'isActive', '1999-08-16 14:14:41.644 +00:00' as 'createdAt', '1999-08-16 14:33:41.930 +00:00' as 'updatedAt', null as 'deletedAt')--`,
+        email: `' UNION SELECT * FROM (SELECT 15 as 'id', '' as 'username', 'acc0unt4nt@${config.get<string>('application.domain')}' as 'email', '12345' as 'password', 'accounting' as 'role', '' as deluxeToken, '1.2.3.4' as 'lastLoginIp' , '/assets/public/images/uploads/default.svg' as 'profileImage', '' as 'totpSecret', 1 as 'isActive', 0 as 'isFederated', '1999-08-16 14:14:41.644 +00:00' as 'createdAt', '1999-08-16 14:33:41.930 +00:00' as 'updatedAt', null as 'deletedAt')--`,
         password: undefined
       })
 
@@ -237,20 +260,12 @@ void describe('/rest/user/login', () => {
 
 void describe('/rest/saveLoginIp', () => {
   void it('GET last login IP will be saved as True-Client-IP header value', async () => {
-    const loginRes = await request(app)
-      .post('/rest/user/login')
-      .set({ 'content-type': 'application/json' })
-      .send({
-        email: 'bjoern.kimminich@gmail.com',
-        password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-      })
-
-    assert.equal(loginRes.status, 200)
+    const { token } = await oauthLogin(app, { email: 'bjoern.kimminich@gmail.com' })
 
     const res = await request(app)
       .get('/rest/saveLoginIp')
       .set({
-        Authorization: 'Bearer ' + loginRes.body.authentication.token,
+        Authorization: 'Bearer ' + token,
         'true-client-ip': '1.2.3.4'
       })
 
@@ -259,20 +274,12 @@ void describe('/rest/saveLoginIp', () => {
   })
 
   void it('GET last login IP will be saved as remote IP when True-Client-IP is not present', async () => {
-    const loginRes = await request(app)
-      .post('/rest/user/login')
-      .set({ 'content-type': 'application/json' })
-      .send({
-        email: 'bjoern.kimminich@gmail.com',
-        password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-      })
-
-    assert.equal(loginRes.status, 200)
+    const { token } = await oauthLogin(app, { email: 'bjoern.kimminich@gmail.com' })
 
     const res = await request(app)
       .get('/rest/saveLoginIp')
       .set({
-        Authorization: 'Bearer ' + loginRes.body.authentication.token
+        Authorization: 'Bearer ' + token
       })
 
     assert.equal(res.status, 200)

@@ -112,7 +112,6 @@ file and open a PR! The same goes for any scripts or automated tools you made fo
     * [★★★★ Forgotten Sales Backup (Sensitive Data Exposure)](https://youtu.be/5g4WRASni6g)
     * [★★★★ GDPR Data Theft (Sensitive Data Exposure)](https://youtu.be/GPW90c4Ahbc)
     * [★★★★ Legacy Typosquatting (Vulnerable Components)](https://youtu.be/HqkGeWtwiHY)
-    * [★★★★ Login Bjoern (Broken Authentication)](https://youtu.be/pmBJ1ZAlpF8)
     * [★★★★ Misplaced Signature File (Sensitive Data Exposure)](https://youtu.be/56qHiwxTjYY)
     * [★★★★ Nested Easter Egg (Cryptographic Issues)](https://youtu.be/yvatrnWvcGE)
     * [★★★★ NoSql Manipulation (Injection)](https://youtu.be/frymuDxKwmc)

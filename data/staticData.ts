@@ -13,10 +13,11 @@ export async function loadStaticData (file: string) {
 
 export interface StaticUser {
   email: string
-  password: string
   key: string
   role: 'admin' | 'customer' | 'deluxe' | 'accounting'
 
+  password?: string
+  federated?: boolean
   username?: string
   profileImage?: string
   walletBalance?: number

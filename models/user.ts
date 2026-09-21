@@ -31,6 +31,7 @@ InferCreationAttributes<User>
   declare profileImage: CreationOptional<string>
   declare totpSecret: CreationOptional<string>
   declare isActive: CreationOptional<boolean>
+  declare isFederated: CreationOptional<boolean>
 }
 
 const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start weakPasswordChallenge
@@ -113,6 +114,10 @@ const UserModelInit = (sequelize: Sequelize) => { // vuln-code-snippet start wea
       isActive: {
         type: DataTypes.BOOLEAN,
         defaultValue: true
+      },
+      isFederated: { // accounts authenticated by an external identity provider must never be authenticated by password
+        type: DataTypes.BOOLEAN,
+        defaultValue: false
       }
     },
     {

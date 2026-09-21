@@ -66,6 +66,7 @@ import datacreator from './data/datacreator'
 import locales from './data/static/locales.json'
 
 import { login } from './routes/login'
+import { oauthLogin } from './routes/oauthLogin'
 import * as verify from './routes/verify'
 import * as address from './routes/address'
 import * as metrics from './routes/metrics'
@@ -425,6 +426,8 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
   app.post('/api/Feedbacks', verify.captchaBypassChallenge())
   /* User registration challenge verifications before finale takes over */
   app.post('/api/Users', (req: Request, res: Response, next: NextFunction) => {
+    /* Accounts of an external identity provider are exclusively created by the OAuth login */
+    delete req.body.isFederated
     if (req.body.email !== undefined && req.body.password !== undefined && req.body.passwordRepeat !== undefined) {
       if (req.body.email.length !== 0 && req.body.password.length !== 0) {
         req.body.email = req.body.email.trim()
@@ -613,6 +616,7 @@ function configureApp (app: ReturnType<typeof express>, seq: typeof sequelize) {
 
   /* Custom Restful API */
   app.post('/rest/user/login', login())
+  app.post('/rest/user/oauth-login', utils.asyncHandler(oauthLogin()))
   app.get('/rest/user/change-password', utils.asyncHandler(changePassword()))
   app.post('/rest/user/reset-password', utils.asyncHandler(resetPassword()))
   app.get('/rest/user/security-question', utils.asyncHandler(securityQuestion()))

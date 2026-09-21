@@ -8,7 +8,7 @@ import assert from 'node:assert/strict'
 import request from 'supertest'
 import type { Express } from 'express'
 import { createTestApp } from './helpers/setup'
-import { login } from './helpers/auth'
+import { oauthLogin } from './helpers/auth'
 import { challenges } from '../../data/datacache'
 import * as security from '../../lib/insecurity'
 import * as utils from '../../lib/utils'
@@ -41,6 +41,19 @@ void describe('/api/Users', () => {
     for (const user of res.body.data) {
       assert.equal(user.password, undefined)
     }
+  })
+
+  void it('POST new user cannot pose as an account of an external identity provider', async () => {
+    const res = await request(app)
+      .post('/api/Users')
+      .set(jsonHeader)
+      .send({
+        email: 'imposter@horstma.nn',
+        password: 'hooooorst',
+        isFederated: true
+      })
+    assert.equal(res.status, 201)
+    assert.equal(res.body.data.isFederated, false)
   })
 
   void it('POST new user', async () => {
@@ -235,10 +248,7 @@ void describe('/api/Users/:id', () => {
 
 void describe('/rest/user/whoami', () => {
   void it('GET own user id and email on who-am-i request', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await oauthLogin(app, { email: 'bjoern.kimminich@gmail.com' })
     const res = await request(app)
       .get('/rest/user/whoami')
       .set({ Cookie: `token=${token}` })
@@ -284,10 +294,7 @@ void describe('/rest/user/whoami', () => {
   })
 
   void it('GET who-am-i with fields parameter returns only requested fields', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await oauthLogin(app, { email: 'bjoern.kimminich@gmail.com' })
     const res = await request(app)
       .get('/rest/user/whoami?fields=id,email')
       .set({ Cookie: `token=${token}` })
@@ -299,10 +306,7 @@ void describe('/rest/user/whoami', () => {
   })
 
   void it('GET who-am-i with fields parameter does not return password by default', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await oauthLogin(app, { email: 'bjoern.kimminich@gmail.com' })
     const res = await request(app)
       .get('/rest/user/whoami?fields=id,email')
       .set({ Cookie: `token=${token}` })
@@ -313,10 +317,7 @@ void describe('/rest/user/whoami', () => {
   })
 
   void it('GET who-am-i with fields parameter can be tricked into returning password', async () => {
-    const { token } = await login(app, {
-      email: 'bjoern.kimminich@gmail.com',
-      password: 'bW9jLmxpYW1nQGhjaW5pbW1pay5ucmVvamI='
-    })
+    const { token } = await oauthLogin(app, { email: 'bjoern.kimminich@gmail.com' })
     const res = await request(app)
       .get('/rest/user/whoami?fields=id,email,password')
       .set({ Cookie: `token=${token}` })
